@@ -30,6 +30,12 @@ main {
 
     overflow-y: scroll;
     -webkit-overflow-scrolling: touch;
-    
+
     width: 100%;
+}
+input[type="button"] {
+    z-index: 1;
+}
+canvas {
+    z-index: 0;
 }

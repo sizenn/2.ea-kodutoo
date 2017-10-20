@@ -12,6 +12,11 @@ var TYPER = function(){
 	this.HEIGHT = window.innerHeight;
 	this.canvas = null;
 	this.ctx = null;
+  this.canvas2 = null;
+  this.ctx2 = null;
+  this.timerMultiplier = 1;
+
+  this.tickSpeed = 500;
 
 	this.words = []; // kõik sõnad
 	this.word = null; // preagu arvamisel olev sõna
@@ -32,7 +37,6 @@ TYPER.routes = {
   },
   'index-view' : function (){
     console.log("esileht");
-
   }
 };
 
@@ -40,12 +44,17 @@ TYPER.prototype = {
 
 	// Funktsioon, mille käivitame alguses
 	init: function(){
-    this.canvas = document.getElementsByTagName('canvas')[0];
+    this.canvas = document.getElementsByTagName('canvas')[1];
 		this.ctx = this.canvas.getContext('2d');
-
+    this.canvas2 = document.getElementsByTagName('canvas')[0];
+    this.ctx2 = this.canvas2.getContext('2d');
 		// canvase laius ja kõrgus veebisirvija akna suuruseks (nii style, kui reso)
+    this.canvas2.style.width = this.WIDTH + 'px';
+    //this.canvas2.style.height = this.HEIGHT/5*2 + 'px';
+    this.canvas2.style.height = this.HEIGHT + 'px';
 		this.canvas.style.width = this.WIDTH + 'px';
 		this.canvas.style.height = this.HEIGHT + 'px';
+
 
 		//resolutsioon
 		// kui retina ekraan, siis võib ja peaks olema 2 korda suurem
@@ -61,33 +70,31 @@ TYPER.prototype = {
 	},
   routeChange : function(event){
     this.currentRoute = location.hash.slice(1);
-    console.log(this.currentRoute);
 
     if(this.routes[this.currentRoute]){
-      
+
     }else{
       //404 not found
     }
   },
   startGame: function(){
-
+    this.timerMultiplier = 1;
+    this.tickSpeed = 500;
 		this.loadWords();
   },
 
 	loadPlayerData: function(){
 
 		// küsime mängija nime ja muudame objektis nime
-		var p_name = prompt("Sisesta mängija nimi");
-
+		var p_name = document.getElementById("name").value;
 		// Kui ei kirjutanud nime või jättis tühjaks
 		if(p_name === null || p_name === ""){
 			p_name = "Tundmatu";
-
 		}
 
 		// Mänigja objektis muudame nime
 		this.player.name = p_name; // player =>>> {name:"Romil", score: 0}
-        console.log(this.player);
+
 	},
 
 	loadWords: function(){
@@ -120,20 +127,58 @@ TYPER.prototype = {
 
 				//asendan massiivi
 				typerGame.words = structureArrayByWordLength(words_from_file);
-				console.log(typerGame.words);
 
 				// küsime mängija andmed
                 typerGame.loadPlayerData();
 
 				// kõik sõnad olemas, alustame mänguga
+
 				typerGame.start();
+        typerGame.timer();
 			}
 		};
 
 		xmlhttp.open('GET','./lemmad2013.txt',true);
 		xmlhttp.send();
 	},
+  timer: function(){
+    var that = this;
+    this.timerInterval = setTimeout(function(){that.timerDraw();},this.tickSpeed);
+  },
+  timerCalc: function(){
 
+  },
+  timerDraw: function(){
+    if(this.timerMultiplier >= 1.00){
+      this.timerMultiplier = 1.00;
+    }
+    if(this.timerMultiplier <= 0){
+      location.href='#index-view';
+    }else{
+      this.ctx2.clearRect( 0, 0, this.canvas2.width, this.canvas2.height);
+      this.ctx2.fillStyle="red";
+      this.ctx2.fillStyle="red";
+      this.ctx2.fillRect(this.canvas2.width/6,this.canvas2.height/4,this.canvas2.width/6*4,this.canvas.height/80);
+      this.ctx2.fillStyle="green";
+      this.ctx2.fillRect(this.canvas2.width/6,this.canvas2.height/4,this.canvas2.width/6*4*this.timerMultiplier,this.canvas.height/80);
+      this.ctx2.stroke();
+      this.timerMultiplier -= 0.02;
+      var that = this;
+      this.timerInterval = setTimeout(function(){that.timerDraw();},this.tickSpeed);
+    }
+  },
+  screenFlash: function(){
+    this.ctx2.strokeStyle="red";
+    this.ctx2.lineWidth="8";
+    this.ctx2.rect(0,0,this.canvas2.width,this.canvas2.height);
+    this.ctx2.stroke();
+    var that = this;
+    setTimeout(function(){
+      that.ctx2.strokeStyle="white";
+      that.ctx2.rect(0,0,this.canvas2.width,this.canvas2.height);
+      that.ctx2.stroke();
+    },200);
+  },
 	start: function(){
 
 		// Tekitame sõna objekti Word
@@ -159,7 +204,6 @@ TYPER.prototype = {
 
         // random sõna, mille salvestame siia algseks
     	var word = this.words[generated_word_length][random_index];
-
     	// Word on defineeritud eraldi Word.js failis
         this.word = new Word(word, this.canvas, this.ctx);
     },
@@ -174,28 +218,30 @@ TYPER.prototype = {
 		// Võrdlen kas meie kirjutatud täht on sama mis järele jäänud sõna esimene
 		//console.log(this.word);
 		if(letter === this.word.left.charAt(0)){
-
+      this.timerMultiplier += 0.01;
 			// Võtame ühe tähe maha
 			this.word.removeFirstLetter();
 
 			// kas sõna sai otsa, kui jah - loosite uue sõna
 
-			if(this.word.left.length === 0){
+			if(this.word.left.length === 1){
 
 				this.guessed_words += 1;
-
-                //update player score
-                this.player.score = this.guessed_words;
-
+        this.tickSpeed = 500 - (parseInt(this.guessed_words/5)*30);
+        //update player score
+        this.player.score = this.guessed_words;
 				//loosin uue sõna
 				this.generateWord();
 			}
 
 			//joonistan uuesti
 			this.word.Draw();
-		}
+		}else{
+      this.timerMultiplier -= 0.02;
+      this.screenFlash();
+    }
 
-	} // keypress end
+	}
 
 };
 
@@ -229,5 +275,4 @@ function structureArrayByWordLength(words){
 window.onload = function(){
 	var typerGame = new TYPER();
 	window.typerGame = typerGame;
-  console.log("game is loaded");
 };
