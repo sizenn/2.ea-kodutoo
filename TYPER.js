@@ -15,8 +15,14 @@ var TYPER = function(){
   this.canvas2 = null;
   this.ctx2 = null;
   this.timerMultiplier = 1;
-
+  this.players = [];
   this.tickSpeed = 500;
+
+  this.typingTotalTime = 0;
+  this.typingStartTime = 0;
+  this.typingTotalLetters = 0;
+  this.typingAvgTime = 0;
+  this.currentScore = 0;
 
 	this.words = []; // kõik sõnad
 	this.word = null; // preagu arvamisel olev sõna
@@ -24,9 +30,16 @@ var TYPER = function(){
 	this.guessed_words = 0; // arvatud sõnade arv
 
 	//mängija objekt, hoiame nime ja skoori
-	this.player = {name: null, score: 0};
-
+	//this.player = {name: null, score: 0, avgSpeed: 0, bestScore: 0};
+  this.player = null;
 	this.init();
+};
+var Player = function(name){
+  this.name = name;
+  this.topScore = 0;
+  this.avgSpeed = 0;
+  this.nowScore = 0;
+  this.nowSpeed = 0;
 };
 
 TYPER.routes = {
@@ -80,6 +93,7 @@ TYPER.prototype = {
   startGame: function(){
     this.timerMultiplier = 1;
     this.tickSpeed = 500;
+    this.loadPlayerData();
 		this.loadWords();
   },
 
@@ -93,8 +107,8 @@ TYPER.prototype = {
 		}
 
 		// Mänigja objektis muudame nime
-		this.player.name = p_name; // player =>>> {name:"Romil", score: 0}
-
+		this.player = new Player(p_name); // player =>>> {name:"Romil", score: 0}
+    console.log(this.player.name+"nimi kuvatud");
 	},
 
 	loadWords: function(){
@@ -129,7 +143,7 @@ TYPER.prototype = {
 				typerGame.words = structureArrayByWordLength(words_from_file);
 
 				// küsime mängija andmed
-                typerGame.loadPlayerData();
+
 
 				// kõik sõnad olemas, alustame mänguga
 
@@ -153,7 +167,8 @@ TYPER.prototype = {
       this.timerMultiplier = 1.00;
     }
     if(this.timerMultiplier <= 0){
-      location.href='#index-view';
+      console.log("game ended");
+      this.endGame();
     }else{
       this.ctx2.clearRect( 0, 0, this.canvas2.width, this.canvas2.height);
       this.ctx2.fillStyle="red";
@@ -179,9 +194,52 @@ TYPER.prototype = {
       that.ctx2.stroke();
     },200);
   },
+  endGame: function(){
+    if(!localStorage.players){
+      localStorage.setItem('players', JSON.stringify(this.players));
+    }
+    if(localStorage.players){
+      this.players = JSON.parse(localStorage.players);
+      this.hasRecord = false;
+      this.avgSpeed = this.typingTotalLetters / this.typingTotalTime * 1000;
+      var that = this;
+      var index = 0;
+      this.players.forEach(function(player){
+        index += 1;
+        if(player.name === that.player.name){
+          that.hasRecord = true;
+          if(that.currentScore > player.topScore){
+            that.player.topScore = that.currentScore;
+          }else{that.player.topScore = player.topScore;}
+          if(that.avgSpeed > player.avgSpeed){
+            that.player.avgSpeed = player.avgSpeed;
+          }else{that.player.avgSpeed = player.avgSpeed;}
+          that.player.nowSpeed = player.avgSpeed;
+          that.player.nowScore = player.currentScore;
+          that.players.splice(index,1);
+          that.players.push(that.player);
+        }
+      });
+      if(!this.hasRecord){
+        this.player.topScore = this.currentScore;
+        this.player.nowScore = this.currentScore;
+        this.player.avgSpeed = this.avgSpeed;
+        this.player.nowSpeed = this.avgSpeed;
+        this.players.push(this.player);
+
+      }
+      localStorage.setItem('players', JSON.stringify(this.players));
+    }
+    location.href='#index-view';
+  },
 	start: function(){
 
 		// Tekitame sõna objekti Word
+    this.typingAvgTime = 0;
+    this.typingStartTime = Date.now();
+    console.log(this.typingStartTime);
+    this.typingTotalTime = 0;
+    this.typingTotalLetters = 0;
 		this.generateWord();
 		//console.log(this.word);
 
@@ -219,6 +277,7 @@ TYPER.prototype = {
 		//console.log(this.word);
 		if(letter === this.word.left.charAt(0)){
       this.timerMultiplier += 0.01;
+      this.currentScore += 1;
 			// Võtame ühe tähe maha
 			this.word.removeFirstLetter();
 
@@ -226,11 +285,15 @@ TYPER.prototype = {
 
 			if(this.word.left.length === 1){
 
-				this.guessed_words += 1;
+
         this.tickSpeed = 500 - (parseInt(this.guessed_words/5)*30);
         //update player score
-        this.player.score = this.guessed_words;
+
 				//loosin uue sõna
+        this.typingTotalTime += (Date.now() - this.typingStartTime);
+        this.typingTotalLetters += this.word_min_length + parseInt(this.guessed_words/5);
+        this.guessed_words += 1;
+        this.typingStartTime = Date.now();
 				this.generateWord();
 			}
 
@@ -238,6 +301,7 @@ TYPER.prototype = {
 			this.word.Draw();
 		}else{
       this.timerMultiplier -= 0.02;
+      this.currentScore -= 2;
       this.screenFlash();
     }
 
